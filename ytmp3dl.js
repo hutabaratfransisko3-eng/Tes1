@@ -3,7 +3,7 @@ import FormData from 'form-data'
 
 export async function ytmp3dl(url) {
   if (
-    !/^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?.*?[&?]v=|youtu\.be\/)[\w-]{11}(\S*)?$/i.test(
+    !/^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?[^\s]*?v=|youtu\.be\/)[\w-]{11}(\S*)?$/i.test(
       url
     )
   ) {
