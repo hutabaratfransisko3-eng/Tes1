@@ -1,66 +1,41 @@
-import ytdl from '@distube/ytdl-core'
-
-// Mengambil cookie string dari env Railway
-const youtubeCookie = process.env.YT_COOKIE || ''
-
-// Fungsi untuk merapikan format cookie teks Netscape menjadi format string yang dipahami HTTP Header
-function parseCookies(rawCookie) {
-  if (!rawCookie) return ''
-  if (rawCookie.includes('COOKIE_NAME') || rawCookie.includes('# Netscape')) {
-    // Jika formatnya adalah file text cookies.txt, kita ambil baris yang valid saja
-    return rawCookie
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith('#'))
-      .map(line => {
-        const parts = line.split('\t')
-        if (parts.length >= 7) {
-          return `${parts[5]}=${parts[6]}`
-        }
-        return null
-      })
-      .filter(Boolean)
-      .join('; ')
-  }
-  return rawCookie
-}
+import axios from 'axios'
 
 export async function ytmp3dl(url) {
-  if (!ytdl.validateURL(url)) {
+  // Validasi URL YouTube sederhana
+  if (!/^(https?:\/\/)?((www|m)\.)?(youtube\.com|youtu\.be)\/.+$/i.test(url)) {
     throw new Error('Invalid YouTube URL.')
   }
 
   try {
-    const options = {}
-    
-    if (youtubeCookie) {
-      const cleanCookie = parseCookies(youtubeCookie)
-      options.requestOptions = {
-        headers: {
-          cookie: cleanCookie,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+    // Meminta link unduhan langsung dari API publik Cobalt
+    const { data } = await axios.post('https://api.cobalt.tools/api/json', {
+      url: url,
+      vQuality: '720',     // Kualitas video (tidak berpengaruh banyak karena kita ambil audio)
+      isAudioOnly: true,   // PENTING: Hanya ambil audio jalurnya mp3
+      audioFormat: 'mp3',  // Format target mp3
+      aAcceptVol: true
+    }, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       }
-    }
-
-    // Ambil info video dari YouTube
-    const info = await ytdl.getInfo(url, options)
-    
-    // Pilih format audio saja dengan kualitas tertinggi
-    const format = ytdl.chooseFormat(info.formats, { 
-      quality: 'highestaudio', 
-      filter: 'audioonly' 
     })
 
-    if (!format || !format.url) {
-      throw new Error('No suitable audio format found.')
+    // Jika Cobalt mengembalikan error atau tidak ada link
+    if (data.status === 'error') {
+      throw new Error(data.text || 'Cobalt API internal error.')
+    }
+
+    if (!data.url) {
+      throw new Error('Download link dari Cobalt tidak ditemukan.')
     }
 
     return {
-      title: info.videoDetails.title || 'Unknown Video',
-      link: format.url
+      title: data.picker || 'YouTube Audio',
+      link: data.url // Link MP3 matang yang siap diunduh oleh bot.js
     }
   } catch (error) {
-    throw new Error(`YouTube Extraction Failed: ${error.message}`)
+    const errorMsg = error.response?.data?.text || error.message
+    throw new Error(`YouTube Cobalt Extraction Failed: ${errorMsg}`)
   }
 }
