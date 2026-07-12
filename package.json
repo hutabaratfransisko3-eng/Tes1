@@ -1,4 +1,4 @@
-{
+to{
   "name": "yt2top4top-bot",
   "version": "1.0.0",
   "description": "Discord bot yang mengubah link YouTube menjadi link Top4Top",
@@ -20,6 +20,7 @@
     "node": "20.x"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.15.9",
     "axios": "^1.18.1",
     "cheerio": "^1.2.0",
     "discord.js": "^14.26.5",
