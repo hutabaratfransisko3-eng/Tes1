@@ -1,35 +1,29 @@
-import axios from 'axios'
-import FormData from 'form-data'
+import ytdl from '@distube/ytdl-core'
 
 export async function ytmp3dl(url) {
-  if (
-    !/^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?.*?[&?]v=|youtu\.be\/)[\w-]{11}(\S*)?$/i.test(
-      url
-    )
-  ) {
+  if (!ytdl.validateURL(url)) {
     throw new Error('Invalid YouTube URL.')
   }
 
-  const form = new FormData()
-  form.append('url', url)
+  try {
+    // Mengambil informasi video langsung dari YouTube
+    const info = await ytdl.getInfo(url)
+    
+    // Mencari format audio terbaik tanpa video
+    const format = ytdl.chooseFormat(info.formats, { 
+      quality: 'highestaudio', 
+      filter: 'audioonly' 
+    })
 
-  const { data } = await axios.post('https://www.youtubemp3.ltd/convert', form, {
-    headers: {
-      ...form.getHeaders(),
-      Accept: 'application/json, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
-      Origin: 'https://www.youtubemp3.ltd',
-      Referer: 'https://www.youtubemp3.ltd/',
-      Connection: 'keep-alive'
-    },
-  })
+    if (!format || !format.url) {
+      throw new Error('No suitable audio format found.')
+    }
 
-  if (!data?.link) throw new Error('Download link not found.')
-
-  return {
-    title: data.filename || 'Unknown',
-    link: data.link
+    return {
+      title: info.videoDetails.title || 'Unknown Video',
+      link: format.url // Link langsung dari server Google Video
+    }
+  } catch (error) {
+    throw new Error(`YouTube Extraction Failed: ${error.message}`)
   }
 }
