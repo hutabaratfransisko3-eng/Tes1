@@ -7,13 +7,12 @@ export async function ytmp3dl(url) {
   }
 
   try {
-    // Meminta link unduhan langsung dari API publik Cobalt
-    const { data } = await axios.post('https://api.cobalt.tools/api/json', {
+    // PERBAIKAN: Menggunakan endpoint utama API Cobalt terbaru
+    const { data } = await axios.post('https://api.cobalt.tools/', {
       url: url,
-      vQuality: '720',     // Kualitas video (tidak berpengaruh banyak karena kita ambil audio)
-      isAudioOnly: true,   // PENTING: Hanya ambil audio jalurnya mp3
-      audioFormat: 'mp3',  // Format target mp3
-      aAcceptVol: true
+      downloadMode: 'audio', // Format baru Cobalt untuk memilih mode audio
+      audioFormat: 'mp3',    // Format target mp3
+      audioBitrate: '320'    // Kualitas audio terbaik
     }, {
       headers: {
         'Accept': 'application/json',
@@ -21,18 +20,19 @@ export async function ytmp3dl(url) {
       }
     })
 
-    // Jika Cobalt mengembalikan error atau tidak ada link
+    // Jika API Cobalt merespons dengan status error
     if (data.status === 'error') {
       throw new Error(data.text || 'Cobalt API internal error.')
     }
 
+    // Format respons Cobalt terbaru biasanya langsung mengirim properti .url
     if (!data.url) {
       throw new Error('Download link dari Cobalt tidak ditemukan.')
     }
 
     return {
-      title: data.picker || 'YouTube Audio',
-      link: data.url // Link MP3 matang yang siap diunduh oleh bot.js
+      title: data.filename || 'YouTube Audio',
+      link: data.url // Link MP3 matang yang siap diambil oleh bot.js
     }
   } catch (error) {
     const errorMsg = error.response?.data?.text || error.message
