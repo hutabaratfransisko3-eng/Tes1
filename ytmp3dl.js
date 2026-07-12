@@ -1,41 +1,72 @@
 import axios from 'axios'
 
 export async function ytmp3dl(url) {
-  // Validasi URL YouTube sederhana
+  // Validasi URL YouTube
   if (!/^(https?:\/\/)?((www|m)\.)?(youtube\.com|youtu\.be)\/.+$/i.test(url)) {
     throw new Error('Invalid YouTube URL.')
   }
 
   try {
-    // PERBAIKAN: Menggunakan endpoint utama API Cobalt terbaru
-    const { data } = await axios.post('https://api.cobalt.tools/', {
-      url: url,
-      downloadMode: 'audio', // Format baru Cobalt untuk memilih mode audio
-      audioFormat: 'mp3',    // Format target mp3
-      audioBitrate: '320'    // Kualitas audio terbaik
-    }, {
+    // ---------------------------------------------------------
+    // TAHAP 1: Kirim link ke yt1s.com untuk cari video dan token
+    // ---------------------------------------------------------
+    const searchForm = new URLSearchParams()
+    searchForm.append('q', url)
+    searchForm.append('vt', 'home')
+
+    const searchRes = await axios.post('https://yt1s.com/api/ajaxSearch/index', searchForm, {
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Origin': 'https://yt1s.com',
+        'Referer': 'https://yt1s.com/en'
       }
     })
 
-    // Jika API Cobalt merespons dengan status error
-    if (data.status === 'error') {
-      throw new Error(data.text || 'Cobalt API internal error.')
+    const searchData = searchRes.data
+    if (searchData.status !== 'ok') {
+      throw new Error('Gagal mendapatkan data dari server konverter.')
     }
 
-    // Format respons Cobalt terbaru biasanya langsung mengirim properti .url
-    if (!data.url) {
-      throw new Error('Download link dari Cobalt tidak ditemukan.')
+    const vid = searchData.vid
+    const title = searchData.title
+
+    // Ambil token rahasia (k) dari daftar kualitas MP3 yang tersedia
+    const mp3Keys = Object.keys(searchData.links?.mp3 || {})
+    if (mp3Keys.length === 0) {
+      throw new Error('Format MP3 tidak tersedia untuk video ini.')
+    }
+    
+    // Biasanya mp3128 adalah key yang standar, kita ambil index pertama saja
+    const kToken = searchData.links.mp3[mp3Keys[0]].k
+
+    // ---------------------------------------------------------
+    // TAHAP 2: Gunakan token (k) untuk mendapatkan link download asli
+    // ---------------------------------------------------------
+    const convertForm = new URLSearchParams()
+    convertForm.append('vid', vid)
+    convertForm.append('k', kToken)
+
+    const convertRes = await axios.post('https://yt1s.com/api/ajaxConvert/convert', convertForm, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Origin': 'https://yt1s.com',
+        'Referer': 'https://yt1s.com/en'
+      }
+    })
+
+    const convertData = convertRes.data
+    if (convertData.status !== 'ok' || !convertData.dlink) {
+      throw new Error('Gagal mengonversi video ke MP3.')
     }
 
     return {
-      title: data.filename || 'YouTube Audio',
-      link: data.url // Link MP3 matang yang siap diambil oleh bot.js
+      title: title || 'YouTube Audio',
+      link: convertData.dlink // Link unduhan matang siap dioper ke top4top
     }
+
   } catch (error) {
-    const errorMsg = error.response?.data?.text || error.message
-    throw new Error(`YouTube Cobalt Extraction Failed: ${errorMsg}`)
+    throw new Error(`Scraper Failed: ${error.message}`)
   }
 }
