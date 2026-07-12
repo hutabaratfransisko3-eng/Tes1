@@ -23,7 +23,7 @@ const client = new Client({
 const TARGET_CHANNEL_ID = process.env.YT_TARGET_CHANNEL_ID || null
 
 // Note: the middle alternative intentionally has no leading "&"/"?" requirement before
-// "v=" — that used to reject the most common share format (youtube.com/watch?v=ID).
+// "v=" â€” that used to reject the most common share format (youtube.com/watch?v=ID).
 const YOUTUBE_URL_RE = /^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?[^\s]*?v=|youtu\.be\/)[\w-]{11}(\S*)?$/i
 const YOUTUBE_URL_SEARCH_RE = /(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?[^\s]*?v=|youtu\.be\/)[\w-]{11}(\S*)?/i
 
@@ -80,7 +80,18 @@ async function convertToTop4Top(url) {
 
   let buffer
   try {
-    const response = await axios.get(link, { responseType: 'arraybuffer' })
+    // PERBAIKAN: Menambahkan Headers agar tidak terkena Hotlink Protection (Error 404) dari server CDN
+    const response = await axios.get(link, { 
+      responseType: 'arraybuffer',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.youtubemp3.ltd/',
+        'Origin': 'https://www.youtubemp3.ltd',
+        'Connection': 'keep-alive'
+      }
+    })
     buffer = Buffer.from(response.data)
   } catch (error) {
     throw withStage('unduh file audio', error)
@@ -100,7 +111,7 @@ async function convertToTop4Top(url) {
 
 function buildResultEmbed(title, top4topLink) {
   return new EmbedBuilder()
-    .setTitle('✅ Konversi berhasil')
+    .setTitle('âœ… Konversi berhasil')
     .setColor(0x2ecc71)
     .addFields(
       { name: 'Judul', value: title || 'Unknown' },
@@ -108,7 +119,8 @@ function buildResultEmbed(title, top4topLink) {
     )
 }
 
-client.once('ready', async () => {
+// PERBAIKAN: Mengubah 'ready' menjadi 'clientReady' untuk menghilangkan Warning di Railway
+client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`)
   client.user.setActivity('/link2top4top')
 
@@ -128,14 +140,14 @@ client.on('messageCreate', async (message) => {
   if (!match) return
 
   const url = match[0]
-  const statusMsg = await message.reply('🔎 Link terdeteksi, sedang memproses...')
+  const statusMsg = await message.reply('ðŸ”Ž Link terdeteksi, sedang memproses...')
 
   try {
     const { title, top4topLink } = await convertToTop4Top(url)
     await statusMsg.edit({ content: null, embeds: [buildResultEmbed(title, top4topLink)] })
   } catch (error) {
     console.error('Gagal memproses link:', error)
-    await statusMsg.edit(`❌ Gagal memproses link: ${error.message}`)
+    await statusMsg.edit(`âŒ Gagal memproses link: ${error.message}`)
   }
 })
 
@@ -160,9 +172,8 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.editReply({ embeds: [buildResultEmbed(title, top4topLink)] })
   } catch (error) {
     console.error('Gagal memproses link:', error)
-    await interaction.editReply(`❌ Gagal memproses link: ${error.message}`)
+    await interaction.editReply(`âŒ Gagal memproses link: ${error.message}`)
   }
 })
 
 client.login(TOKEN)
-
