@@ -22,7 +22,9 @@ const client = new Client({
 // Restrict auto-detection to one channel via YT_TARGET_CHANNEL_ID, or leave unset to watch every channel the bot can see.
 const TARGET_CHANNEL_ID = process.env.YT_TARGET_CHANNEL_ID || null
 
-const YOUTUBE_URL_RE = /^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?.*?[&?]v=|youtu\.be\/)[\w-]{11}(\S*)?$/i
+// Note: the middle alternative intentionally has no leading "&"/"?" requirement before
+// "v=" — that used to reject the most common share format (youtube.com/watch?v=ID).
+const YOUTUBE_URL_RE = /^(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?[^\s]*?v=|youtu\.be\/)[\w-]{11}(\S*)?$/i
 const YOUTUBE_URL_SEARCH_RE = /(https?:\/\/)?((www|m)\.)?(youtube\.com\/watch\?[^\s]*?v=|youtu\.be\/)[\w-]{11}(\S*)?/i
 
 const SPOTIFY_URL_RE = /^https?:\/\/(open\.)?spotify\.com\/track\/[A-Za-z0-9]{22}(?:\?\S*)?$/i
@@ -41,15 +43,33 @@ function isSupportedLink(url) {
   return YOUTUBE_URL_RE.test(url) || SPOTIFY_URL_RE.test(url)
 }
 
+// Wraps a step's error with which stage failed and the upstream HTTP status (if any),
+// so failures are actionable instead of a bare "status code 404".
+function withStage(stage, error) {
+  const status = error.response?.status
+  const wrapped = new Error(`[${stage}]${status ? ` (HTTP ${status})` : ''} ${error.message}`)
+  wrapped.stage = stage
+  wrapped.cause = error
+  return wrapped
+}
+
 async function resolveSource(url) {
   if (YOUTUBE_URL_RE.test(url)) {
-    const { title, link } = await ytmp3dl(url)
-    return { title, link }
+    try {
+      const { title, link } = await ytmp3dl(url)
+      return { title, link }
+    } catch (error) {
+      throw withStage('konversi YouTube ke MP3', error)
+    }
   }
 
   if (SPOTIFY_URL_RE.test(url)) {
-    const { title, artist, link } = await spotifydl(url)
-    return { title: artist ? `${title} - ${artist}` : title, link }
+    try {
+      const { title, artist, link } = await spotifydl(url)
+      return { title: artist ? `${title} - ${artist}` : title, link }
+    } catch (error) {
+      throw withStage('konversi Spotify ke MP3', error)
+    }
   }
 
   throw new Error('Link tidak dikenali. Hanya mendukung YouTube dan Spotify.')
@@ -58,11 +78,22 @@ async function resolveSource(url) {
 async function convertToTop4Top(url) {
   const { title, link } = await resolveSource(url)
 
-  const response = await axios.get(link, { responseType: 'arraybuffer' })
-  const buffer = Buffer.from(response.data)
+  let buffer
+  try {
+    const response = await axios.get(link, { responseType: 'arraybuffer' })
+    buffer = Buffer.from(response.data)
+  } catch (error) {
+    throw withStage('unduh file audio', error)
+  }
 
   const safeTitle = (title || 'audio').replace(/[\\/:*?"<>|]/g, '_')
-  const top4topLink = await uploadTop4Top(buffer, `${safeTitle}.mp3`)
+
+  let top4topLink
+  try {
+    top4topLink = await uploadTop4Top(buffer, `${safeTitle}.mp3`)
+  } catch (error) {
+    throw withStage('upload ke Top4Top', error)
+  }
 
   return { title, top4topLink }
 }
@@ -134,3 +165,4 @@ client.on('interactionCreate', async (interaction) => {
 })
 
 client.login(TOKEN)
+
