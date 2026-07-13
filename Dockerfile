@@ -10,4 +10,4 @@ COPY . .
 
 ENV NODE_ENV=production
 
-CMD ["node", "bot.js"]
+CMD ["node", "index.js"]
