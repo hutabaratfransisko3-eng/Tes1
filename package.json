@@ -1,32 +1,18 @@
 {
-  "name": "recruitment-bot",
+  "name": "yt-top4top-bot",
   "version": "1.0.0",
-  "description": "Bot Discord untuk recruitment otomatis dengan sistem form",
+  "description": "Bot Discord khusus mengubah link YouTube ke Top4Top",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "recruitment"
-  ],
-  "author": "Dott",
-  "license": "ISC",
   "engines": {
     "node": "20.x"
   },
   "dependencies": {
-    "@discordjs/rest": "^1.7.1",
-    "@types/node": "^22.13.11",
-    "axios": "^1.10.0",
-    "better-sqlite3": "^12.2.0",
-    "cheerio": "^1.1.0",
-    "discord-api-types": "^0.37.120",
-    "discord.js": "^14.21.0",
-    "form-data": "^4.0.4",
-    "node-fetch": "^3.3.2",
-    "quick.db": "^9.1.7"
+    "axios": "^1.18.1",
+    "discord.js": "^14.26.5",
+    "form-data": "^4.0.6"
   }
 }
